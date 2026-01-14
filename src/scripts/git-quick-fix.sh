@@ -25,7 +25,7 @@ do_quick_fix() {
     if [[ -n "$(command git status --porcelain --untracked-files=no --show-stash)" ]]; then
 
         command git add -u
-        command git commit -m "[$ticket_id] Fix: $(date)"
+        command git commit -m "[#$ticket_id] Fix: $(date)"
     fi
 
     if check_upstream_exists; then
