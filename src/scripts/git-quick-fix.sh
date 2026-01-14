@@ -1,0 +1,39 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/common.sh" ]]; then
+
+    # shellcheck source=src/scripts/common.sh
+    source "$SCRIPT_DIR/common.sh"
+else
+    # shellcheck source=/dev/null
+    source ~/.git-scripts/common.sh
+fi
+
+
+do_quick_fix() {
+    local feature_branch
+    local ticket_id
+
+    feature_branch="$(command git rev-parse --abbrev-ref HEAD)"
+    ticket_id="$(echo "$feature_branch" | cut -d'/' -f2)"
+
+    if [[ -n "$(command git status --porcelain --untracked-files=no --show-stash)" ]]; then
+
+        command git add -u
+        command git commit -m "[GH-$ticket_id] Work in progress $(date) (closes GH-$ticket_id)"
+    fi
+
+    if check_upstream_exists; then
+        git push
+    else
+        git push --set-upstream origin HEAD
+    fi
+}
+
+
+do_quick_fix
