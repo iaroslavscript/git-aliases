@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+find_branch() {
+    local name="$1"
+
+    command git branch --list --no-color | grep -qE "^\*\s+${name}$" && echo "${name}"
+}
+
+find_remote_branch() {
+    command git symbolic-ref refs/remote/origin/HEAD | sed 's@^refs/remotes/origin/@@'
+}
+
+
+find_branch "main" || find_branch "master" || find_remote_branch
