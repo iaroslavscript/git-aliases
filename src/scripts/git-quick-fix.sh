@@ -3,6 +3,7 @@
 set -e
 set -o pipefail
 
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/common.sh" ]]; then
 
@@ -33,5 +34,6 @@ do_quick_fix() {
         git push --set-upstream origin HEAD
     fi
 }
+
 
 do_quick_fix
