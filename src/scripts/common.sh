@@ -20,9 +20,11 @@ find_remote_branch() {
     command git symbolic-ref refs/remote/origin/HEAD | sed 's@^refs/remotes/origin/@@'
 }
 
+
 find_development_branch() {
     find_branch "development" || find_branch "dev"
 }
+
 
 find_default_branch() {
     find_branch "main" || find_branch "master" \

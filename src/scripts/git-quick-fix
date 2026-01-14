@@ -18,19 +18,19 @@ do_quick_fix() {
     local feature_branch
     local ticket_id
 
-    feature_branch="$(git rev-parse --abbrev-ref HEAD)"
+    feature_branch="$(command git rev-parse --abbrev-ref HEAD)"
     ticket_id="$(echo "$feature_branch" | cut -d'/' -f2)"
 
-    git add -u
-    git commit -m "[$ticket_id] Fix: $(date)"
+    if [[ -n "$(command git status --porcelain --untracked-files=no --show-stash)" ]]; then
 
-    if [[ -n "$(git status --porcelain --untracked-files=no --show-stash)" ]]; then
+        command git add -u
+        command git commit -m "[$ticket_id] Fix: $(date)"
+    fi
 
-        if check_upstream_exists; then
-            git push
-        else
-            git push --set-upstream origin HEAD
-        fi
+    if check_upstream_exists; then
+        git push
+    else
+        git push --set-upstream origin HEAD
     fi
 }
 

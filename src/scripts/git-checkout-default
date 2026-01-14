@@ -19,7 +19,7 @@ do_checkout_default() {
     branch="$(find_default_branch)"
 
     if [[ -n "$branch" ]]; then
-        git checkout "$branch"
+        command git checkout "$branch"
     else
         echo "error: no local or remote default branch found" > /dev/stderr
         false

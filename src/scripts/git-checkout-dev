@@ -19,7 +19,7 @@ do_checkout_default() {
     branch="$(find_development_branch)"
 
     if [[ -n "$branch" ]]; then
-        git checkout "$branch"
+        command git checkout "$branch"
     else
         echo "error: no development branch found" > /dev/stderr
         false
