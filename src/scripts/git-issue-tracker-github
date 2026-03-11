@@ -1,0 +1,55 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+parse_args() {
+
+    local issue_summary=""
+    local issue_body=""
+
+    while [[ $# -gt 0 ]] && [[ "$1" != "--" ]]; do
+        case $1 in
+        -h|--help)
+            echo "Usage: $0 [--from <value>] [--] <args for other command>"
+            exit 0
+            ;;
+        --summary)
+            if [[ "$2" ]]; then
+                issue_summary="$2"
+            else
+                echo "Option '--summary' requires a value" >&2
+                exit 1 
+            fi
+            ;;
+        --body)
+            if [[ "$2" ]]; then
+                issue_body="$2"
+            else
+                echo "Option '--summary' requires a value" >&2
+                exit 1 
+            fi
+            ;; 
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        esac
+        shift
+    done
+
+    if [ -z "$issue_body" ]; then
+        issue_body="$issue_summary"
+    fi
+}
+
+
+parse_args "$@"
+
+issue_url=$(gh issue create --title="${issue_summary}" --body="${issue_body}")
+
+echo DEBUG: got url "$issue_url"
+ticket_id=$(echo "$issue_url" | rev | cut -d '/' -f 1)
+
+echo "${ticket_id}"

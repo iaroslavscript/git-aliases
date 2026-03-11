@@ -1,0 +1,150 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+if [ -z "$GIT_ISSUE_TRACKER" ]; then
+    # variable is not set or empty
+    # use default value
+    GIT_ISSUE_TRACKER=git-issue-tracker
+fi
+
+
+cli_array_init() {
+    local -n cli_opts_cai_ref=$1
+
+    cli_opts_cai_ref[ID]=""
+    cli_opts_cai_ref[SUMMARY]=""
+    cli_opts_cai_ref[SUMMARY_SC]=""
+    cli_opts_cai_ref[EXTRA]=""
+    cli_opts_cai_ref[DATA]=""
+    cli_opts_cai_ref[BRANCH]=""
+}
+
+
+# parse knowns args until "--" meet
+# pass all other args to a command defined by GIT_ISSUE_TRACKER
+parse_args() {
+    local -n cli_opts_ref=$1
+    shift
+
+    while [[ $# -gt 0 ]] && [[ "$1" != "--" ]]; do
+        case $1 in
+        -h|--help)
+            echo "Usage: $0 [-f|--from <value>] [--] <args for other command>"
+            exit 0
+            ;;
+        -s|--summary)
+            if [[ "$2" ]] && [[ "$2" != "--" ]]; then
+                cli_opts_ref[SUMMARY]="$2"
+                shift
+            else
+                echo "Option '$1' requires a value" >&2
+                exit 1 
+            fi
+            ;;
+        -f|--from)
+            if [[ "$2" ]] && [[ "$2" != "--" ]]; then
+                cli_opts_ref[ID]="$2"
+                shift
+            else
+                echo "Option '$1' requires a value" >&2
+                exit 1 
+            fi
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        esac
+        shift
+    done
+
+    if [[ "$1" == "--" ]]; then
+        shift
+    fi
+    cli_opts_ref[EXTRA]="$*"
+}
+
+
+issue_show() {
+    local -n cli_opts_is_ref=$1
+
+    "$GIT_ISSUE_TRACKER" issue-show "${cli_opts_is_ref[ID]}" || (echo "Issue not found" >&2 ; exit 1)
+}
+
+
+issue_create() {
+    local -n cli_opts_ic_ref=$1
+
+    "$GIT_ISSUE_TRACKER" issue-create "${cli_opts_ic_ref[SUMMARY]}" || (echo 'Failed to create issue' >&2 ; exit 1)
+}
+
+
+convert_to_snake_case() {
+    echo "$1" \
+    | sed -E 's/[-[:space:]]/_/g' | sed -E 's/_+/_/g'| sed -E 's/(.*)/\L\1/g'
+}
+
+
+get_branch_name() {
+    local issue_id="$1"
+    local summary="$2"
+    local summar_sc=""
+
+    summar_sc="$(convert_to_snake_case "${summary}")"
+    summar_sc="$(echo "${summar_sc}" | head 30)"
+
+    echo "f/${issue_id}__${summar_sc}"
+}
+
+
+find_or_create_issue() {
+    local -n cli_opts_fci_ref=$1
+    local data=""
+
+    if [[ "${cli_opts_fci_ref[ID]}" ]]; then
+
+        data="$(issue_show cli_opts_fci_ref)"
+    else
+
+        data="$(issue_create cli_opts_fci_ref)"
+    fi
+
+    cli_opts_fci_ref[DATA]="${data}"
+}
+
+
+parse_data() {
+    local -n data_pd_ref=$1
+    local value=""
+
+    value="$(echo "${data_pd_ref[DATA]}" | jq -r .id)"
+    data_pd_ref[ID]="${value}"
+
+    value="$(echo "${data_pd_ref[DATA]}" | jq -r .summary)"
+    data_pd_ref[SUMMARY]="${value}"
+
+    value="$(get_branch_name "${data_pd_ref[ID]}" "${data_pd_ref[SUMMARY_SC]}")"
+    data_pd_ref[BRANCH]="${value}"
+}
+
+
+git_fnew() {
+    declare -A cli_opts
+
+    cli_array_init cli_opts
+
+    parse_args cli_opts "$@"
+
+    find_or_create_issue cli_opts
+
+    parse_data cli_opts
+
+    echo git checkout -b "${cli_opts[BRANCH]}"
+    echo git push -u "origin/${cli_opts[BRANCH]}"
+}
+
+
+git_fnew "$@"

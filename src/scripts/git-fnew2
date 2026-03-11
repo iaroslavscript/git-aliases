@@ -1,0 +1,199 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+export GIT_ISSUE_TRACKER="${GIT_ISSUE_TRACKER:-git-issue-tracker}"
+
+if [ -z "$GIT_CLIENT" ]; then
+    echo "GIT_CLIENT value not set" >&2
+    exit
+fi
+
+
+convert_to_snake_case() {
+    echo "$1" \
+    | sed -E 's/[-[:space:]]/_/g' | sed -E 's/_+/_/g'| sed -E 's/(.*)/\L\1/g'
+}
+
+
+get_branch_name() {
+    local issue_id="$1"
+    local summary="$2"
+    local summary_sc=""
+
+    summary_sc="$(convert_to_snake_case "${summary}")"
+    summary_sc="$(echo "${summary_sc}" | cut -c -30)"
+
+    echo "f/${issue_id}__${summary_sc}"
+}
+
+
+git_fnew() {
+    declare -A cli_opts
+    declare -A issue
+
+    init() {
+        cli_opts[FROM]=""
+        cli_opts[SUMMARY]=""
+        cli_opts[EXTRA]=""
+        cli_opts[REMOTE_URL]=""
+
+        issue[RAW_DATA]=""
+        issue[ID]=""
+        issue[SUMMARY]=""
+        issue[BRANCH]=""
+    }
+
+    free() {
+        unset cli_opts
+        unset issue
+    }
+
+
+    # parse knowns args until "--" meet
+    # pass all other args to a command defined by GIT_ISSUE_TRACKER
+    parse_args() {
+
+        while [[ $# -gt 0 ]] && [[ "$1" != "--" ]]; do
+            case $1 in
+            -h|--help)
+                echo "Usage: $0 [-f|--from <value>] [--] <args for other command>"
+                exit 0
+                ;;
+            -s|--summary)
+                if [[ "$2" ]] && [[ "$2" != "--" ]]; then
+                    cli_opts[SUMMARY]="$2"
+                    shift
+                else
+                    echo "Option '$1' requires a value" >&2
+                    exit 1 
+                fi
+                ;;
+            -f|--from)
+                if [[ "$2" ]] && [[ "$2" != "--" ]]; then
+                    cli_opts[FROM]="$2"
+                    shift
+                else
+                    echo "Option '$1' requires a value" >&2
+                    exit 1 
+                fi
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            esac
+            shift
+        done
+
+        if [[ "$1" == "--" ]]; then
+            shift
+        fi
+        cli_opts[EXTRA]="$*"
+    }
+
+
+    parse_remote_url() {
+        local value
+
+        value="$(git config --get remote.origin.url)"
+        cli_opts[REMOTE_URL]="${value}"
+    }
+
+
+    issue_show() {
+        "${GIT_ISSUE_TRACKER}" issue-show "${cli_opts[FROM]}" || (echo "Issue not found" >&2 ; exit 1)
+    }
+
+
+    issue_create() {
+        "${GIT_ISSUE_TRACKER}" issue-create --summary "${cli_opts[SUMMARY]}" || (echo 'Failed to create issue' >&2 ; exit 1)
+    }
+
+
+    pr_create() {
+        local summary="$1"
+
+        "${GIT_CLIENT}" pr-create \
+            --remote-url "${cli_opts[REMOTE_URL]}" \
+            --branch "${issue[BRANCH]}" \
+            --summary "${summary}" \
+        || (echo 'Failed to create pull request' >&2 ; exit 1)
+    }
+
+
+    find_or_create_issue() {
+        local data=""
+
+        if [[ "${cli_opts[FROM]}" ]]; then
+
+            data="$(issue_show)"
+        else
+
+            data="$(issue_create)"
+        fi
+
+        issue[RAW_DATA]="${data}"
+    }
+
+
+    parse_data() {
+        local value=""
+
+        value="$(echo "${issue[RAW_DATA]}" | jq -r .id)"
+        issue[ID]="${value}"
+
+        value="$(echo "${issue[RAW_DATA]}" | jq -r .summary)"
+        issue[SUMMARY]="${value}"
+
+        value="$(get_branch_name "${issue[ID]}" "${issue[SUMMARY]}")"
+        issue[BRANCH]="${value}"
+    }
+
+    create_feature_branch() {
+        echo git checkout -b "${issue[BRANCH]}"
+        echo git commit --allow-empty -m "\"[${issue[ID]}] ${issue[SUMMARY]}\""
+        echo git push -u "origin/${issue[BRANCH]}"
+    }
+
+    create_wip_pr() {
+        pr_create "WIP [${issue[ID]}] ${cli_opts[SUMMARY]}"
+    }
+
+    debug_arrays() {
+        
+        echo
+
+        for key in "${!cli_opts[@]}"
+        do
+            echo "DEBUG: key $key = ${cli_opts[$i]}"
+        done
+
+        for key in "${!issue[@]}"
+        do
+            echo "DEBUG: key $key = ${issue[$i]}"
+        done
+    }
+
+
+    init
+
+    parse_args "$@"
+
+    parse_remote_url
+
+    find_or_create_issue
+
+    parse_data
+
+    create_feature_branch
+
+    create_wip_pr
+
+    free
+}
+
+
+git_fnew "$@"

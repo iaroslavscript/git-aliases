@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/common.sh" ]]; then
+
+    # shellcheck source=src/scripts/common.sh
+    source "$SCRIPT_DIR/common.sh"
+else
+    # shellcheck source=/dev/null
+    source ~/.git-scripts/common.sh
+fi
+
+
+do_cleanup() {
+    local default_branch
+    default_branch="$(find_default_branch)"
+
+    git checkout "$default_branch"
+
+    git fetch --prune
+
+    local branches_to_delete
+    branches_to_delete="$(git branch --merged "$default_branch" | grep -vE "^\*|${default_branch}" | sed 's/^[[:space:]]*//')"
+
+    if [[ -n "$branches_to_delete" ]]; then
+        echo "$branches_to_delete" | xargs -r git branch -d
+    else
+        echo "No merged branches to delete."
+    fi
+}

@@ -1,0 +1,166 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+
+APP_NAME="$(basename "$0")"
+
+
+run_action_issue_show() {
+    declare -A cli_opts_is
+
+    parse_args_cmd_issue_show cli_opts_is "$@"
+    printf '{"id": %s, "summary": "%s"}' \
+        "${cli_opts_is[ID]}" \
+        "Issue summary"
+}
+
+
+run_action_issue_create() {
+
+    declare -A cli_opts_ic
+
+    parse_args_cmd_issue_create cli_opts_ic "$@"
+
+    printf '{"id": %s, "summary": "%s"}' \
+        "42" \
+        "${cli_opts_ic[SUMMARY]}"
+}
+
+
+print_usage() {
+    echo "Usage: ${APP_NAME} [-h|--help] (issue-create|issue-show)"
+}
+
+
+print_help() {
+    printf "Usage: %s
+    Commands:
+        issue-create\tCreate a new issue
+        issue-show\tShow issue details
+    Optional arguments:
+        -h, --help\tShow this help\n" \
+    "${APP_NAME}"
+}
+
+
+print_help_cmd_issue_show() {
+    echo "Usage: ${APP_NAME} issue-show <issue id> [--] <args for other command>"
+}
+
+
+parse_args_cmd_issue_show() {
+
+    local -n cli_opts_is_ref=$1
+    shift
+
+    cli_opts_is_ref[ID]=""
+    cli_opts_is_ref[EXTRA]=""
+
+    if [[ $# -lt 1 ]] || [[ "$1" == "--" ]]; then
+        print_help_cmd_issue_show
+        exit 1
+    fi
+
+    cli_opts_is_ref[ID]="$1"
+    shift
+
+    if [[ $# -gt 0 ]]; then
+    
+        if [[ "$1" != "--" ]]; then
+            echo "Unknown option $1" >&2
+            exit 1
+        elif [[ $# -lt 2 ]]; then
+            echo "Option '--' requires a value" >&2
+        else
+            shift
+            cli_opts_is_ref[EXTRA]="$*"
+        fi
+    fi
+}
+
+
+parse_args_cmd_issue_create() {
+
+    local -n cli_opts_ic_ref=$1
+    shift
+
+    cli_opts_ic_ref[SUMMARY]=""
+    cli_opts_ic_ref[BODY]=""
+    cli_opts_ic_ref[EXTRA]=""
+
+    while [[ $# -gt 0 ]] && [[ "$1" != "--" ]]; do
+        case $1 in
+        -h|--help)
+            echo "Usage: ${APP_NAME} [--from <value>] [--] <args for other command>"
+            exit 0
+            ;;
+        --summary)
+            if [[ "$2" ]]; then
+                cli_opts_ic_ref[SUMMARY]="$2"
+                shift
+            else
+                echo "Option '$1' requires a value" >&2
+                exit 1
+            fi
+            ;;
+        --body)
+            if [[ "$2" ]]; then
+                cli_opts_ic_ref[BODY]="$2"
+                shift
+            else
+                echo "Option '$1' requires a value" >&2
+                exit 1 
+            fi
+            ;; 
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        esac
+        shift
+    done
+
+    if ! [[ "${cli_opts_ic_ref[BODY]}" ]]; then
+        cli_opts_ic_ref[BODY]="${cli_opts_ic_ref[SUMMARY]}"
+    fi
+
+    if [[ "$1" == "--" ]]; then
+        shift
+    fi
+
+    cli_opts_ic_ref[EXTRA]="$*"
+}
+
+
+parse_args() {
+
+    if [[ $# -lt 1 ]]; then
+        print_usage
+        exit 1
+    fi
+
+    case $1 in
+        -h|--help)
+            print_help
+            shift
+            exit 0
+            ;;
+        issue-create)
+            shift
+            run_action_issue_create "$@"
+            ;;
+        issue-show)
+            shift
+            run_action_issue_show "$@"
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+}
+
+
+parse_args "$@"
