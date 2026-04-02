@@ -2,13 +2,20 @@
 
 set -euo pipefail
 
-sudo groupadd -f handoff
-sudo usermod -aG handoff tom
-sudo usermod -aG handoff bob
 
-sudo mkdir -p /srv/git
-sudo git init --bare /srv/git/handoff.git
+if (( $EUID != 0 )); then
+    echo "This script must be run as root. Exiting."
+    exit 1
+fi
 
-sudo chown -R bob:handoff /srv/git/handoff.git
-sudo chmod -R 2770 /srv/git/handoff.git
+
+REPO_BASE_DIR="${REPO_BASE_DIR:-/srv/git}"
+
+
+groupadd -f handoff
+usermod -aG handoff tom
+usermod -aG handoff bob
+
+mkdir -p $REPO_BASE_DIR
+chmod -R bob:bob $REPO_BASE_DIR
 
