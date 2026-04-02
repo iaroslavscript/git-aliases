@@ -1,6 +1,10 @@
 
 all: test
 
+.PHONY: clean
+clean:
+	rm -rf test
+
 .PHONY: dev-setup
 dev-setup: test/.venv/bin/activate
 	python3 -m venv test/.venv
@@ -9,6 +13,7 @@ dev-setup: test/.venv/bin/activate
 
 .PHONY: test
 test:
+	mkdir -p test/usr/local/bin
 	rm -f test/usr/local/bin/*
 	cp -a src/scripts/* test/usr/local/bin/
 	chmod 0755 test/usr/local/bin/*
